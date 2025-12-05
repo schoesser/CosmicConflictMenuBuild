@@ -1,21 +1,16 @@
-//
-//  GameView.swift
-//  SpaceGame
-//
-//  Created by Alexander Wagner on 29.11.25.
-//
-
 import SwiftUI
 import SpriteKit
 
 struct GameView: View {
 
     @Binding var showGame: Bool
+    let level: GameLevel   // 👈 welches Level gespielt werden soll
 
     @State private var scene: GameScene
 
-    init(showGame: Binding<Bool>) {
+    init(showGame: Binding<Bool>, level: GameLevel) {
         _showGame = showGame
+        self.level = level
 
         // Szene wie bisher erstellen
         let s = GameScene()
@@ -23,8 +18,12 @@ struct GameView: View {
         s.size = screenSize
         s.scaleMode = .resizeFill
 
+        // Level in die Szene geben
+        s.level = level
+
         // Callback: nach Level-Ende zurück ins Menü
         s.onLevelCompleted = {
+            // GameScene ruft das nach der 5s-Animation auf
             showGame.wrappedValue = false
         }
 
@@ -123,5 +122,5 @@ struct GameView: View {
 }
 
 #Preview {
-    GameView(showGame: .constant(true))
+    GameView(showGame: .constant(true), level: GameLevels.level1)
 }

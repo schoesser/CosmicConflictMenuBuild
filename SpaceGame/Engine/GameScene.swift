@@ -16,6 +16,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         case rotateRight
     }
 
+    // MARK: - Level / Callback
+
+    /// Welches Level gespielt wird (wird von GameView gesetzt)
+    var level: GameLevel!
+
+    /// Callback, um nach Level-Ende zurück ins Menü zu springen
+    var onLevelCompleted: (() -> Void)?
+    
     // MARK: - Properties
 
     var playerShip: SKSpriteNode!
@@ -27,20 +35,17 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     /// Nur die verfolgenden Gegner-Schiffe (für AI, Schießen, Runden)
     var enemyShips: [SKSpriteNode] = []
 
-    /// Callback, um nach Level-Ende zurück ins Menü zu springen
-    var onLevelCompleted: (() -> Void)?
-
     var currentDirection: TankDirection?
     var lastUpdateTime: TimeInterval = 0
 
     let moveSpeed: CGFloat = 400      // Spieler-Bewegung
-    let rotateSpeed: CGFloat = 4    // Spieler-Rotation
+    let rotateSpeed: CGFloat = 4      // Spieler-Rotation
 
     let enemyMoveSpeed: CGFloat = 90  // Verfolger-Geschwindigkeit
 
     // Kamera
     let cameraNode = SKCameraNode()
-    let cameraZoom: CGFloat = 1.5     // < 1 = näher dran
+    let cameraZoom: CGFloat = 1.5
 
     // Gegner-Feuerrate
     let enemyFireInterval: TimeInterval = 1.5
@@ -59,7 +64,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     var playerHP: Int = 100
 
     var roundLabel: SKLabelNode?
-    /// Aktuelle Runde (1–5)
+    /// Aktuelle Runde (1–5 … oder passend zur Level-Config)
     var currentRound: Int = 1
 
     // HUD
@@ -116,9 +121,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         physicsWorld.gravity = .zero
         physicsWorld.contactDelegate = self
 
+        // Falls aus irgendeinem Grund kein Level gesetzt wurde → Fallback
+        if level == nil {
+            level = GameLevels.level1
+        }
+
         setupBackground()
-        setupLevel()
-        setupEnemies()      // nur Start-Asteroiden, keine Schiffe mehr hier
+        setupLevel()        // nutzt jetzt LevelFactory und GameLevel
+        setupEnemies()      // Start-Asteroiden, evtl. später Boss-Setup
         setupPlayerShip()
         setupCamera()       // ruft auch setupHUD() auf
 
@@ -129,9 +139,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         // Powerup-Timer initialisieren
         lastPowerUpSpawnTime = 0
 
-        // Runde 1 starten + Banner anzeigen
-        startRound(1)
-        showRoundAnnouncement(forRound: 1)
+        // Nur bei Wave-Levels Runden starten
+        if level.type == .normal && (level.config.rounds?.isEmpty == false) {
+            startRound(1)
+            showRoundAnnouncement(forRound: 1)
+        }
     }
 
     // MARK: - Touch → Spieler schießt
@@ -156,12 +168,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         if first.categoryBitMask == PhysicsCategory.bullet &&
            second.categoryBitMask == PhysicsCategory.enemy {
 
-            // Kugel entfernen
             first.node?.removeFromParent()
 
             guard let enemyNode = second.node as? SKSpriteNode else { return }
 
-            // HP-Daten aus userData lesen (oder Defaults)
             if enemyNode.userData == nil {
                 enemyNode.userData = NSMutableDictionary()
             }
@@ -172,12 +182,11 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
             updateEnemyHealthBar(for: enemyNode)
 
             if newHP <= 0 {
-                // Wenn es ein verfolgenden Gegner-Schiff ist → Rundenfortschritt
+                // Ist es ein verfolgenden Gegner-Schiff? → Runde updaten
                 if enemyShips.contains(enemyNode) {
                     registerEnemyShipKilled(enemyNode)
                 }
 
-                // Gegner entfernen
                 let fade = SKAction.fadeOut(withDuration: 0.1)
                 let remove = SKAction.removeFromParent()
                 enemyNode.run(.sequence([fade, remove]))
@@ -190,9 +199,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
            second.categoryBitMask == PhysicsCategory.enemyBullet {
 
             second.node?.removeFromParent()
-
             applyDamageToPlayer(amount: 10)
-            print("Player wurde von Enemy-Bullet getroffen! HP: \(playerHP)")
         }
 
         // Enemy (Asteroid oder Gegner-Schiff) rammt den Spieler
@@ -200,7 +207,6 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
            second.categoryBitMask == PhysicsCategory.enemy {
 
             applyDamageToPlayer(amount: 5)
-            print("Player wurde von Enemy/Asteroid gerammt! HP: \(playerHP)")
         }
 
         // Spieler sammelt Powerup ein
@@ -266,14 +272,14 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         }
 
         // Spieler innerhalb der Map halten
-        if let level = levelNode {
+        if let levelNode = levelNode {
             let marginX = playerShip.size.width / 2
             let marginY = playerShip.size.height / 2
 
-            let minX = level.frame.minX + marginX
-            let maxX = level.frame.maxX - marginX
-            let minY = level.frame.minY + marginY
-            let maxY = level.frame.maxY - marginY
+            let minX = levelNode.frame.minX + marginX
+            let maxX = levelNode.frame.maxX - marginX
+            let minY = levelNode.frame.minY + marginY
+            let maxY = levelNode.frame.maxY - marginY
 
             let clampedX = max(minX, min(maxX, playerShip.position.x))
             let clampedY = max(minY, min(maxY, playerShip.position.y))
@@ -299,7 +305,10 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
         updatePowerUpDurations(currentTime: currentTime)
 
         // Gegner-Waves für aktuelle Runde spawnen
-        handleEnemyWaveSpawning(currentTime: currentTime)
+        if level.type == .normal {
+            handleEnemyWaveSpawning(currentTime: currentTime)
+        }
+        // Boss-Logik könntest du später hier ergänzen (level.type == .boss)
     }
 
     // MARK: - Schaden am Spieler
@@ -377,6 +386,7 @@ class GameScene: SKScene, SKPhysicsContactDelegate {
     // MARK: - Gegner-HP-Konfiguration nach Runde
 
     func enemyMaxHPForCurrentRound() -> Int {
+        // Für Boss-Level könntest du hier später anders skalieren, z.B. über level.config.bossMaxHP
         switch currentRound {
         case 1, 2:
             return 1     // Runde 1–2: 1 Treffer

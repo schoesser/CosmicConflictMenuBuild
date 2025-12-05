@@ -93,7 +93,11 @@ extension GameScene {
     // MARK: - Level
 
     func setupLevel() {
-        levelNode = LevelFactory.makeDemoLevel(size: size)
+        // Falls das Level noch nicht gesetzt wurde (Sicherheit), nimm Level 1
+        let currentLevel = level ?? GameLevels.level1
+        level = currentLevel
+
+        levelNode = LevelFactory.makeLevelNode(for: currentLevel, size: size)
         addChild(levelNode)
     }
 
@@ -156,6 +160,7 @@ extension GameScene {
 
         playerShip.physicsBody?.categoryBitMask = PhysicsCategory.player
         playerShip.physicsBody?.collisionBitMask = PhysicsCategory.wall | PhysicsCategory.enemy
+        // Spieler meldet Treffer mit EnemyBullet + Enemy + PowerUp
         playerShip.physicsBody?.contactTestBitMask =
             PhysicsCategory.enemyBullet | PhysicsCategory.enemy | PhysicsCategory.powerUp
 
@@ -280,7 +285,9 @@ extension GameScene {
     // MARK: - Gegner / Asteroiden + (Schiffe nur per Waves)
 
     func setupEnemies() {
-        // Nur ein paar Start-Asteroiden, KEINE Schiffe hier:
+        // ❗️Nur bei normalen Wave-Levels (z.B. Level 1) feste Start-Asteroiden
+        guard level.type == .normal else { return }
+
         let asteroidPositions: [CGPoint] = [
             CGPoint(x: size.width/2 + 300, y: size.height/2),
             CGPoint(x: size.width/2 - 250, y: size.height/2 + 200),

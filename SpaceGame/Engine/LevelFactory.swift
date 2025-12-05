@@ -9,12 +9,12 @@ import SpriteKit
 
 enum LevelFactory {
 
-    static func makeDemoLevel(size: CGSize) -> SKNode {
-        let texture = SKTexture(imageNamed: "space1")   // dein Space-Level-Bild
+    /// Allgemeine Funktion: baut eine Map für ein GameLevel
+    static func makeLevelNode(for level: GameLevel, size: CGSize) -> SKNode {
+        let textureName = level.config.backgroundTextureName
+        let texture = SKTexture(imageNamed: textureName)
 
-        // Prüfen ob das Bild existiert
         if texture.size() != .zero {
-
             let map = SKSpriteNode(texture: texture)
 
             // Seitenverhältnisse
@@ -33,8 +33,8 @@ enum LevelFactory {
                 finalHeight = size.width / imageAspect
             }
 
-            // WELTGRÖSSE ERHÖHEN – HIER BESTIMMST DU WIE GROSS DIE MAP IST
-            let worldScale: CGFloat = 2.0     // 3x so groß wie der Bildschirm → viel mehr Spielfläche
+            // Weltgröße über LevelConfig
+            let worldScale = level.config.worldScale
             finalWidth  *= worldScale
             finalHeight *= worldScale
 
@@ -47,9 +47,14 @@ enum LevelFactory {
             return map
         }
 
-        // Falls Bild fehlt
+        // Fallback falls Textur fehlt
         let fallback = SKSpriteNode(color: .black, size: size)
         fallback.zPosition = 0
         return fallback
+    }
+
+    /// Kompatibilitäts-Helper für deinen alten Code
+    static func makeDemoLevel(size: CGSize) -> SKNode {
+        return makeLevelNode(for: GameLevels.level1, size: size)
     }
 }

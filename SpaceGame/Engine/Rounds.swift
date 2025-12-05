@@ -7,29 +7,34 @@ import SpriteKit
 
 extension GameScene {
 
-    // MARK: - Konfiguration pro Runde
+    // MARK: - Round Config über GameLevel
 
-    /// Intervall & Anzahl der Gegner-Schiffe pro Runde
-    func roundConfig(for round: Int) -> (spawnInterval: TimeInterval, totalEnemies: Int) {
-        switch round {
-        case 1:
-            return (5.0, 5)    // alle 5s, 5 Schiffe
-        case 2:
-            return (4.0, 10)   // alle 4s, 10 Schiffe
-        case 3:
-            return (3.0, 15)   // alle 3s, 15 Schiffe
-        case 4:
-            return (2.0, 15)   // alle 2s, 15 Schiffe
-        case 5:
-            return (1.0, 15)   // jede Sekunde, 15 Schiffe
-        default:
-            return (1.0, 0)
+    /// Holt die Konfiguration für eine bestimmte Runde aus der Level-Config
+    func roundConfig(for round: Int) -> RoundConfig? {
+        // Falls das Level Runden definiert hat → aus Config lesen
+        if let rounds = level.config.rounds, !rounds.isEmpty {
+            guard round >= 1 && round <= rounds.count else { return nil }
+            return rounds[round - 1]
+        } else {
+            // Fallback: dein alter Hardcoded-Plan
+            switch round {
+            case 1:
+                return RoundConfig(spawnInterval: 5.0, enemyCount: 5)
+            case 2:
+                return RoundConfig(spawnInterval: 4.0, enemyCount: 10)
+            case 3:
+                return RoundConfig(spawnInterval: 3.0, enemyCount: 15)
+            case 4:
+                return RoundConfig(spawnInterval: 2.0, enemyCount: 15)
+            case 5:
+                return RoundConfig(spawnInterval: 1.0, enemyCount: 15)
+            default:
+                return nil
+            }
         }
     }
 
-    // MARK: - Runde starten / fortschalten
-
-    /// Neue Runde vorbereiten (Zähler + HUD)
+    /// Neue Runde vorbereiten
     func startRound(_ round: Int) {
         currentRound = round
         enemiesSpawnedThisRound = 0
@@ -44,17 +49,18 @@ extension GameScene {
     func handleEnemyWaveSpawning(currentTime: TimeInterval) {
         if isLevelCompleted { return }
         guard levelNode != nil else { return }
+        guard level.type == .normal else { return }
 
-        let config = roundConfig(for: currentRound)
+        guard let config = roundConfig(for: currentRound) else { return }
 
         // Bereits alle Gegner für diese Runde gespawnt?
-        if enemiesSpawnedThisRound >= config.totalEnemies {
+        if enemiesSpawnedThisRound >= config.enemyCount {
             return
         }
 
         // Erstes Mal: sofort spawnen
         if lastEnemySpawnTime == 0 ||
-           currentTime - lastEnemySpawnTime >= config.spawnInterval {
+            currentTime - lastEnemySpawnTime >= config.spawnInterval {
 
             lastEnemySpawnTime = currentTime
             spawnEnemyShipAtEdge()
@@ -62,18 +68,16 @@ extension GameScene {
         }
     }
 
-    /// Spawnt ein verfolgendes Gegner-Schiff zufällig am Rand der Map
+    /// Spawnt ein verfolgenden Gegner-Schiff zufällig am Rand der Map
     func spawnEnemyShipAtEdge() {
-        guard let level = levelNode else { return }
+        guard let levelNode = levelNode else { return }
 
-        // Wichtig: hier muss deine Fabrik-Funktion für das Gegner-Schiff stehen.
-        // Falls du eine andere Funktion verwendest, hier anpassen:
-        let enemy = makeChaserShip()
+        let enemy = makeChaserShip()   // kommt aus deiner Setup-Extension
 
-        let minX = level.frame.minX
-        let maxX = level.frame.maxX
-        let minY = level.frame.minY
-        let maxY = level.frame.maxY
+        let minX = levelNode.frame.minX
+        let maxX = levelNode.frame.maxX
+        let minY = levelNode.frame.minY
+        let maxY = levelNode.frame.maxY
 
         let side = Int.random(in: 0..<4)
         var pos = CGPoint.zero
@@ -104,44 +108,43 @@ extension GameScene {
 
         enemiesKilledThisRound += 1
 
-        let config = roundConfig(for: currentRound)
-        if enemiesKilledThisRound >= config.totalEnemies {
+        guard let config = roundConfig(for: currentRound) else { return }
+
+        if enemiesKilledThisRound >= config.enemyCount {
             advanceToNextRound()
         }
     }
 
     func advanceToNextRound() {
-        if currentRound < 5 {
-            let nextRound = currentRound + 1
+        // Wie viele Runden hat das Level?
+        let totalRounds: Int
+        if let rounds = level.config.rounds, !rounds.isEmpty {
+            totalRounds = rounds.count
+        } else {
+            totalRounds = 5   // Fallback
+        }
 
-            // Banner „Round X!“ für NÄCHSTE Runde
-            showRoundAnnouncement(forRound: nextRound)
-
-            // Nach kurzer Pause wirklich starten
-            run(.sequence([
-                .wait(forDuration: 2.0),
-                .run { [weak self] in
-                    self?.startRound(nextRound)
-                }
-            ]))
+        if currentRound < totalRounds {
+            let next = currentRound + 1
+            startRound(next)
+            showRoundAnnouncement(forRound: next)
         } else {
             handleLevelCompleted()
         }
     }
 
-    // MARK: - Banner & Level-Ende
+    // MARK: - Visual: "Round X!" Banner
 
-    /// „Round X!“ mittig im Bildschirm anzeigen
     func showRoundAnnouncement(forRound round: Int) {
         let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
         label.text = "Round \(round)!"
         label.fontSize = 40
-        label.fontColor = .white
+        label.fontColor = .yellow
         label.zPosition = 300
         label.position = CGPoint(x: 0, y: 0)
         label.alpha = 0
 
-        cameraNode.addChild(label)
+        hudNode.addChild(label)
 
         let fadeIn  = SKAction.fadeIn(withDuration: 0.3)
         let wait    = SKAction.wait(forDuration: 1.2)
@@ -151,9 +154,10 @@ extension GameScene {
         label.run(.sequence([fadeIn, wait, fadeOut, remove]))
     }
 
+    // MARK: - Level komplett geschafft
+
     func handleLevelCompleted() {
-        // Nur einmal ausführen
-        if isLevelCompleted { return }
+        guard !isLevelCompleted else { return }
         isLevelCompleted = true
 
         let label = SKLabelNode(fontNamed: "AvenirNext-Bold")
@@ -164,18 +168,14 @@ extension GameScene {
         label.position = CGPoint(x: 0, y: 0)
         label.alpha = 0
 
-        cameraNode.addChild(label)
+        hudNode.addChild(label)
+        label.run(SKAction.fadeIn(withDuration: 0.5))
 
-        let fadeIn  = SKAction.fadeIn(withDuration: 0.5)
-        let wait    = SKAction.wait(forDuration: 2.0)
-        let fadeOut = SKAction.fadeOut(withDuration: 0.5)
-        let remove  = SKAction.removeFromParent()
-
-        label.run(.sequence([fadeIn, wait, fadeOut, remove]))
-
-        // 5 Sekunden nach Level-Ende zurück ins Menü
-        run(.wait(forDuration: 5.0)) { [weak self] in
+        // Nach 5 Sekunden zurück ins Menü
+        let wait = SKAction.wait(forDuration: 5.0)
+        let callback = SKAction.run { [weak self] in
             self?.onLevelCompleted?()
         }
+        hudNode.run(SKAction.sequence([wait, callback]))
     }
 }
