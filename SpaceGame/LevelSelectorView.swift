@@ -1,5 +1,5 @@
 //
-//  ContentView.swift
+//  LevelSelectorView.swift
 //  SpaceGame
 //
 //  Created by Alexander Schösser on 09.12.25.
@@ -31,8 +31,8 @@ fileprivate let stars: [Star] = {
     return starArray
 }()
 
-// --- Animated Background (Consolidated for use in all views) ---
-func AnimatedSpaceBackground() -> some View {
+// --- Animated Background ---
+func AnimatedSpaceBackgroundforLevelSelectorView() -> some View {
     let primaryBackground = Color(red: 0.1, green: 0.0, blue: 0.3)
     return TimelineView(.animation) { timeline in
         GeometryReader { geometry in
@@ -57,8 +57,8 @@ func AnimatedSpaceBackground() -> some View {
     }
 }
 
-// --- Custom Button Style (Consolidated for use in all views) ---
-struct MainMenuButtonStyle: ButtonStyle {
+// --- Custom Button Style ---
+struct MainMenuButtonStyleforLevelSelectorView: ButtonStyle {
     var background: Color = .cyan
     var foreground: Color = Color(red: 0.1, green: 0.0, blue: 0.3)
     var border: Color? = nil
@@ -78,84 +78,63 @@ struct MainMenuButtonStyle: ButtonStyle {
     }
 }
 
-// MARK: - CONTENTVIEW (Main Router)
 
-struct ContentView: View {
-    @State private var showGame = false
-    @State private var showLevelSelector = false
-    @State private var selectedLevel: GameLevel? = nil
-    
-    // FIX: Add the state variable to control the visibility of SettingsContentView
-    @State private var showSettings = false
+// MARK: - LEVELSELECTORVIEW (Level Menu)
+
+struct LevelSelectorView: View {
+    @Binding var showGame: Bool
+    @Binding var selectedLevel: GameLevel?
+    @Binding var showLevelSelector: Bool
     
     let accentColor = Color.cyan
 
     var body: some View {
+        ZStack {
+            AnimatedSpaceBackground()
 
-        if showGame, let selectedLevel {
-            // 1. Show GameView
-            GameView(showGame: $showGame, level: selectedLevel)
-            
-        } else if showLevelSelector {
-            // 2. Show LevelSelectorView (defined in the other file)
-            LevelSelectorView(
-                showGame: $showGame,
-                selectedLevel: $selectedLevel,
-                showLevelSelector: $showLevelSelector
-            )
-            
-        } else if showSettings {
-            // FIX: Show SettingsContentView when showSettings is true
-            SettingsContentView(showSettings: $showSettings)
-            
-        } else {
-            // 3. Show Main Menu
-            ZStack {
-                AnimatedSpaceBackground()
+            VStack(spacing: 40) {
+                Text("SELECT MISSION")
+                    .font(.system(size: 44, weight: .heavy, design: .monospaced))
+                    .bold()
+                    .foregroundColor(accentColor)
+                    .shadow(color: accentColor.opacity(0.8), radius: 12)
+                    .padding(.top, 40)
 
-                VStack(spacing: 30) {
-                    Text("SPACE GAME")
-                        .font(.system(size: 44, weight: .heavy, design: .monospaced))
-                        .bold()
-                        .foregroundColor(accentColor)
-                        .shadow(color: accentColor.opacity(0.8), radius: 12)
-                        .padding(.bottom, 20)
-                    
-                    // Primary Levels Button
-                    Button("Start Mission (Levels)") {
-                        showLevelSelector = true
+                VStack(spacing: 16) {
+                    // Level 1 Button: Launches game
+                    Button(GameLevels.level1.name) {
+                        selectedLevel = GameLevels.level1
+                        showGame = true
                     }
-                    .buttonStyle(MainMenuButtonStyle(background: accentColor, border: .yellow))
-                    .padding(.horizontal, 24)
-                    
-                    // Secondary Menu Buttons (Applied MainMenuButtonStyle)
-                    VStack(spacing: 12) {
-                        Button("Settings") {
-                            // FIX: Set the state variable to show the settings view
-                            showSettings = true
-                        }
-                        .buttonStyle(MainMenuButtonStyle(background: Color.white.opacity(0.15), foreground: .white, border: .gray))
+                    .buttonStyle(MainMenuButtonStyle(background: accentColor))
 
-                        Button("High Scores") {
-                            // Action for High Scores
-                        }
-                        .buttonStyle(MainMenuButtonStyle(background: Color.white.opacity(0.15), foreground: .white, border: .gray))
-
-                        // Exit Button with Red Glow
-                        Button("Exit") {
-                            // Action for Exit
-                        }
-                        .buttonStyle(MainMenuButtonStyle(background: .red, foreground: .white, border: .red.opacity(0.8)))
-                        
+                    // Level 2 Button: Launches game
+                    Button(GameLevels.level2.name) {
+                        selectedLevel = GameLevels.level2
+                        showGame = true
                     }
+                    .buttonStyle(MainMenuButtonStyle(background: .purple, foreground: .white, border: .yellow))
+                    
+                    // Button to return to the Main Menu
+                    Button("Back to Main Menu") {
+                        showLevelSelector = false
+                    }
+                    .buttonStyle(MainMenuButtonStyle(background: .gray.opacity(0.6), foreground: .white))
                     .padding(.top, 20)
-                    .padding(.horizontal, 24)
                 }
+                .padding(30)
+                .background(
+                    RoundedRectangle(cornerRadius: 25)
+                        .fill(Color.white.opacity(0.15))
+                        .stroke(accentColor, lineWidth: 2)
+                        .shadow(color: accentColor.opacity(0.5), radius: 10)
+                )
+                .padding(.horizontal, 24)
+                
+                Spacer()
             }
         }
     }
 }
 
-#Preview {
-    ContentView()
-}
+
