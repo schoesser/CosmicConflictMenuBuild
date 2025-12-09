@@ -143,7 +143,7 @@ struct ContentView: View {
 
                         // Exit Button with Red Glow
                         Button("Exit") {
-                            // Action for Exit
+
                         }
                         .buttonStyle(MainMenuButtonStyle(background: .red, foreground: .white, border: .red.opacity(0.8)))
                         
